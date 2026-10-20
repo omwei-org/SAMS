@@ -28,6 +28,7 @@ static esp_lcd_panel_handle_t panel;
 
 static esp_err_t lcd_init(void)
 {
+    ESP_LOGI(TAG, "LCD init: Starting");
     gpio_config_t backlight = {
         .pin_bit_mask = 1ULL << LCD_PIN_BL,
         .mode = GPIO_MODE_OUTPUT,
@@ -36,7 +37,9 @@ static esp_err_t lcd_init(void)
         .intr_type = GPIO_INTR_DISABLE,
     };
     ESP_RETURN_ON_ERROR(gpio_config(&backlight), TAG, "backlight GPIO config failed");
+    ESP_LOGI(TAG, "LCD init: Backlight GPIO configured");
     ESP_RETURN_ON_ERROR(gpio_set_level(LCD_PIN_BL, 1), TAG, "backlight enable failed");
+    ESP_LOGI(TAG, "LCD init: Backlight enabled");
 
     spi_bus_config_t bus = {
         .sclk_io_num = LCD_PIN_SCLK,
@@ -47,6 +50,7 @@ static esp_err_t lcd_init(void)
         .max_transfer_sz = LCD_WIDTH * 20 * sizeof(uint16_t),
     };
     ESP_RETURN_ON_ERROR(spi_bus_initialize(SPI2_HOST, &bus, SPI_DMA_CH_AUTO), TAG, "SPI init failed");
+    ESP_LOGI(TAG, "LCD init: SPI bus initialized");
 
     esp_lcd_panel_io_handle_t io = NULL;
     esp_lcd_panel_io_spi_config_t io_config = {
@@ -61,6 +65,7 @@ static esp_err_t lcd_init(void)
     ESP_RETURN_ON_ERROR(
         esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)SPI2_HOST, &io_config, &io),
         TAG, "LCD SPI IO init failed");
+    ESP_LOGI(TAG, "LCD init: SPI IO initialized");
 
     esp_lcd_panel_dev_config_t panel_config = {
         .reset_gpio_num = LCD_PIN_RST,
@@ -68,10 +73,15 @@ static esp_err_t lcd_init(void)
         .bits_per_pixel = 16,
     };
     ESP_RETURN_ON_ERROR(esp_lcd_new_panel_st7789(io, &panel_config, &panel), TAG, "ST7789 init failed");
+    ESP_LOGI(TAG, "LCD init: ST7789 panel created");
     ESP_RETURN_ON_ERROR(esp_lcd_panel_reset(panel), TAG, "LCD reset failed");
+    ESP_LOGI(TAG, "LCD init: Panel reset");
     ESP_RETURN_ON_ERROR(esp_lcd_panel_init(panel), TAG, "LCD panel init failed");
+    ESP_LOGI(TAG, "LCD init: Panel initialized");
     ESP_RETURN_ON_ERROR(esp_lcd_panel_invert_color(panel, true), TAG, "LCD invert failed");
+    ESP_LOGI(TAG, "LCD init: Color inverted");
     ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(panel, true), TAG, "LCD display enable failed");
+    ESP_LOGI(TAG, "LCD init: Display enabled");
     return ESP_OK;
 }
 
@@ -114,8 +124,18 @@ void app_main(void)
 
     if (lcd_init() != ESP_OK) {
         ESP_LOGE(TAG, "LCD init failed; gate demo will continue on serial only");
-    } else if (lcd_fill(0x001F) != ESP_OK) {
-        ESP_LOGE(TAG, "LCD fill failed");
+    } else {
+        ESP_LOGI(TAG, "LCD init successful, filling with white");
+        if (lcd_fill(0xFFFF) != ESP_OK) {
+            ESP_LOGE(TAG, "LCD white fill failed");
+        } else {
+            ESP_LOGI(TAG, "LCD white fill OK, waiting 2s");
+            vTaskDelay(pdMS_TO_TICKS(2000));
+            ESP_LOGI(TAG, "Now filling with blue");
+            if (lcd_fill(0x001F) != ESP_OK) {
+                ESP_LOGE(TAG, "LCD blue fill failed");
+            }
+        }
     }
 
     slc_gate_t gate;
